@@ -4,76 +4,26 @@ import time
 import ffmpeg
 from openai import OpenAI
 from pygame import mixer
-import wave
-import sys
-import json
-from vosk import Model, KaldiRecognizer, SetLogLevel
-SetLogLevel(-1)
+import speech_recognition as sr
+import sounddevice
 
-PHONE_RECORDINGS_PATH = "./data/easy_voice_recorder"
+
 client = OpenAI()
-vosk_model = Model(model_name="vosk-model-small-en-in-0.4")
 
-def convert_m4a_to_vosk(input_path, output_path):
-    return ffmpeg.input(input_path).output(output_path, acodec="pcm_s16le", ar="16k", ac=1, loglevel="quiet", y=None).run()
-
-def convert_m4a_to_mp3(input_path, output_path):
-    return ffmpeg.input(input_path).output(output_path, loglevel="quiet").run()
-
-def get_latest_recording():
-    old_recording_files = glob(os.path.join(PHONE_RECORDINGS_PATH, "*.m4a"))    
-    time.sleep(2)
-    new_recording_files = glob(os.path.join(PHONE_RECORDINGS_PATH, "*.m4a"))
-    diff_files = [k for k in new_recording_files if k not in old_recording_files]
-    if len(diff_files) == 0:
-        return
-    latest_recording = sorted(diff_files, reverse=True)[0]
-    return latest_recording
-
-def speech_to_text(audio_file_path):
-    with wave.open(audio_file_path, "rb") as wf:
-        if wf.getnchannels() != 1 or wf.getsampwidth() != 2 or wf.getcomptype() != "NONE":
-            print("Audio file must be WAV format mono PCM.")
-            sys.exit(1)
-
-        # You can also init model by name or with a folder path
-        # model = Model(model_name="vosk-model-en-us-0.21")
-        # model = Model("models/en")
-
-        rec = KaldiRecognizer(vosk_model, wf.getframerate())
-        rec.SetWords(True)
-        rec.SetPartialWords(True)
-
-        results = []
-        while True:
-            data = wf.readframes(4000)
-            if len(data) == 0:
-                break
-            if rec.AcceptWaveform(data):
-                results.append(rec.Result())
-            # else:
-            #     results.append(rec.PartialResult())
-
-        results.append(rec.FinalResult())
-    text = json.loads(results[0])["text"]
-    return text
-
-def get_chatgpt_response(input_path, output_path):
+def get_chatgpt_response(input_path, output_path, transcribe=True):
     ''' load audio file
     '''
     t = time.time()
-    with open(input_path, "rb") as audio_file:
-        transcription = client.audio.transcriptions.create(
-            model="whisper-1",
-            file=audio_file
-        ).text
+    if transcribe:
+        with open(input_path, "rb") as audio_file:
+            transcription = client.audio.transcriptions.create(
+                model="whisper-1",
+                file=audio_file
+            ).text
+    else:
+        transcription = input_path
     print(f"Transcribed in {time.time() - t:.2f} sec")
     print(f"Input question: {transcription}")
-
-    # t = time.time()
-    # transcription = speech_to_text(input_path)
-    # print(f"Transcribed in {time.time() - t:.2f} sec")
-    # print(f"Input question: {transcription}")
 
     '''Generate answer
     '''
@@ -105,12 +55,27 @@ def play_audio(audio_path):
     while mixer.music.get_busy():
         time.sleep(1)
 
-def run():
+def convert_m4a_to_mp3(input_path, output_path):
+    return ffmpeg.input(input_path).output(output_path, loglevel="quiet").run()
+
+def get_latest_recording():
+    PHONE_RECORDINGS_PATH = "./data/easy_voice_recorder"
+    old_recording_files = glob(os.path.join(PHONE_RECORDINGS_PATH, "*.m4a"))    
+    time.sleep(2)
+    new_recording_files = glob(os.path.join(PHONE_RECORDINGS_PATH, "*.m4a"))
+    diff_files = [k for k in new_recording_files if k not in old_recording_files]
+    if len(diff_files) == 0:
+        return
+    latest_recording = sorted(diff_files, reverse=True)[0]
+    return latest_recording
+
+def get_user_audio_query_from_phone():
     latest_recording = get_latest_recording()    
     if latest_recording is None:
-        return    
+        return None, None   
     
     print("Got recording ...")
+    play_audio("data/sound_effects/corgi_bark.mp3")
     recording_name = os.path.basename(latest_recording).split(".")[0]
     latest_recording_mp3 = f"data/easy_voice_recorder_mp3/{recording_name}.mp3"
     t = time.time()
@@ -119,25 +84,63 @@ def run():
         output_path=latest_recording_mp3
         )
     print(f"Converted to mp3 in {time.time() - t:.2f} sec")
+    return latest_recording_mp3, recording_name
 
-    # latest_recording_wav = f"data/easy_voice_recorder_wav/{recording_name}.wav"
-    # t = time.time()
-    # convert_m4a_to_vosk(
-    #     input_path=latest_recording,
-    #     output_path=latest_recording_wav
-    #     )
-    # print(f"Converted to wav in {time.time() - t:.2f} sec")
-        
+def speech_recognition(hotword=False):    
+    r = sr.Recognizer()
+    while 1:
+        with sr.Microphone() as source:
+            # print("speak")                        
+            audio = r.listen(source, phrase_time_limit=2 if hotword else 5)
+            # print("heard")
+            said = ""
+            try:
+                t = time.time()
+                said = r.recognize_google(audio).lower()
+                # print(f"you said = {said}, transcribed in {time.time()-t:.2f} sec")
+                if not hotword:
+                    return said
+                if "corgi" in said or "corgee" in said or "corgy" in said or "corgo" in said or "cargo" in said:
+                    play_audio("data/sound_effects/corgi_bark.mp3")
+                    return
+            except Exception as e:
+                pass
+                # print("Exception: " + str(e))
+    return
+
+def get_user_audio_query_from_microphone():
+    print('Hotword detection...')
+    speech_recognition(hotword=True)
+    print('Query detection...')
+    return speech_recognition(hotword=False)    
+
+def get_user_audio_query(source="phone"):
+    if source == "phone":
+        return get_user_audio_query_from_phone()
+    if source == "microphone":
+        return get_user_audio_query_from_microphone(), None
+    return
+
+def run():
+    # Get user query
+    user_audio_query, recording_name = get_user_audio_query(source="microphone")
+    if user_audio_query is None:
+        return
+
+    # Get agent response
+    recording_name = recording_name or "default"
     output_path = f"data/chatgpt_responses/{recording_name}.mp3"
     get_chatgpt_response(
-        input_path=latest_recording_mp3,
-        output_path=output_path
+        input_path=user_audio_query,
+        output_path=output_path,
+        transcribe=False    
         )
+
+    # Play agent response
     t = time.time()
     play_audio(output_path)
     print(f"Played audio in {time.time() - t:.2f} sec")
 
 if __name__ == "__main__":
-    # run()
     while 1:
         run()
