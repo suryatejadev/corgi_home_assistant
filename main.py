@@ -10,7 +10,7 @@ import json
 from vosk import Model, KaldiRecognizer, SetLogLevel
 SetLogLevel(-1)
 
-PHONE_RECORDINGS_PATH = "./EasyVoiceRecorder"
+PHONE_RECORDINGS_PATH = "./data/easy_voice_recorder"
 client = OpenAI()
 vosk_model = Model(model_name="vosk-model-small-en-in-0.4")
 
@@ -61,19 +61,19 @@ def speech_to_text(audio_file_path):
 def get_chatgpt_response(input_path, output_path):
     ''' load audio file
     '''
-    # t = time.time()
-    # with open(input_path, "rb") as audio_file:
-    #     transcription = client.audio.transcriptions.create(
-    #         model="whisper-1",
-    #         file=audio_file
-    #     ).text
-    # print(f"Transcribed in {time.time() - t:.2f} sec")
-    # print(f"Input question: {transcription}")
-
     t = time.time()
-    transcription = speech_to_text(input_path)
+    with open(input_path, "rb") as audio_file:
+        transcription = client.audio.transcriptions.create(
+            model="whisper-1",
+            file=audio_file
+        ).text
     print(f"Transcribed in {time.time() - t:.2f} sec")
     print(f"Input question: {transcription}")
+
+    # t = time.time()
+    # transcription = speech_to_text(input_path)
+    # print(f"Transcribed in {time.time() - t:.2f} sec")
+    # print(f"Input question: {transcription}")
 
     '''Generate answer
     '''
@@ -106,32 +106,31 @@ def play_audio(audio_path):
         time.sleep(1)
 
 def run():
-    latest_recording = get_latest_recording()
-    # latest_recording = "EasyVoiceRecorder/My recording 11.m4a"
+    latest_recording = get_latest_recording()    
     if latest_recording is None:
         return    
     
     print("Got recording ...")
     recording_name = os.path.basename(latest_recording).split(".")[0]
-    # latest_recording_mp3 = f"EasyVoiceRecorder_mp3/{recording_name}.mp3"
-    # t = time.time()
-    # convert_m4a_to_mp3(
-    #     input_path=latest_recording,
-    #     output_path=latest_recording_mp3
-    #     )
-    # print(f"Converted to mp3 in {time.time() - t:.2f} sec")
-
-    latest_recording_wav = f"EasyVoiceRecorder_wav/{recording_name}.wav"
+    latest_recording_mp3 = f"data/easy_voice_recorder_mp3/{recording_name}.mp3"
     t = time.time()
-    convert_m4a_to_vosk(
+    convert_m4a_to_mp3(
         input_path=latest_recording,
-        output_path=latest_recording_wav
+        output_path=latest_recording_mp3
         )
-    print(f"Converted to wav in {time.time() - t:.2f} sec")
-    
-    output_path = f"chatgpt_responses/{recording_name}.mp3"
+    print(f"Converted to mp3 in {time.time() - t:.2f} sec")
+
+    # latest_recording_wav = f"data/easy_voice_recorder_wav/{recording_name}.wav"
+    # t = time.time()
+    # convert_m4a_to_vosk(
+    #     input_path=latest_recording,
+    #     output_path=latest_recording_wav
+    #     )
+    # print(f"Converted to wav in {time.time() - t:.2f} sec")
+        
+    output_path = f"data/chatgpt_responses/{recording_name}.mp3"
     get_chatgpt_response(
-        input_path=latest_recording_wav,
+        input_path=latest_recording_mp3,
         output_path=output_path
         )
     t = time.time()
