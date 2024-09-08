@@ -38,7 +38,7 @@ def get_chatgpt_response(input_path, output_path, transcribe=True):
     print(f"ChatGPT Response: {completion}")
 
     '''Convert answer to speech
-    '''    
+    '''
     t = time.time()
     response = client.audio.speech.create(
         model="tts-1",
@@ -49,7 +49,7 @@ def get_chatgpt_response(input_path, output_path, transcribe=True):
     print(f"Generated audio file in {time.time() - t:.2f} sec")
 
 def play_audio(audio_path):
-    mixer.init()
+    mixer.init(frequency=44100, size=-16, channels=2, buffer=4096)
     mixer.music.load(audio_path)
     mixer.music.play()
     while mixer.music.get_busy():
@@ -60,7 +60,7 @@ def convert_m4a_to_mp3(input_path, output_path):
 
 def get_latest_recording():
     PHONE_RECORDINGS_PATH = "./data/easy_voice_recorder"
-    old_recording_files = glob(os.path.join(PHONE_RECORDINGS_PATH, "*.m4a"))    
+    old_recording_files = glob(os.path.join(PHONE_RECORDINGS_PATH, "*.m4a"))
     time.sleep(2)
     new_recording_files = glob(os.path.join(PHONE_RECORDINGS_PATH, "*.m4a"))
     diff_files = [k for k in new_recording_files if k not in old_recording_files]
@@ -70,10 +70,10 @@ def get_latest_recording():
     return latest_recording
 
 def get_user_audio_query_from_phone():
-    latest_recording = get_latest_recording()    
+    latest_recording = get_latest_recording()
     if latest_recording is None:
-        return None, None   
-    
+        return None, None
+
     print("Got recording ...")
     play_audio("data/sound_effects/corgi_bark.mp3")
     recording_name = os.path.basename(latest_recording).split(".")[0]
@@ -86,11 +86,11 @@ def get_user_audio_query_from_phone():
     print(f"Converted to mp3 in {time.time() - t:.2f} sec")
     return latest_recording_mp3, recording_name
 
-def speech_recognition(hotword=False):    
+def speech_recognition(hotword=False):
     r = sr.Recognizer()
     while 1:
         with sr.Microphone() as source:
-            # print("speak")                        
+            # print("speak")
             audio = r.listen(source, phrase_time_limit=2 if hotword else 5)
             # print("heard")
             said = ""
@@ -112,7 +112,7 @@ def get_user_audio_query_from_microphone():
     print('Hotword detection...')
     speech_recognition(hotword=True)
     print('Query detection...')
-    return speech_recognition(hotword=False)    
+    return speech_recognition(hotword=False)
 
 def get_user_audio_query(source="phone"):
     if source == "phone":
@@ -133,7 +133,7 @@ def run():
     get_chatgpt_response(
         input_path=user_audio_query,
         output_path=output_path,
-        transcribe=False    
+        transcribe=False
         )
 
     # Play agent response
