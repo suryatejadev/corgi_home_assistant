@@ -114,13 +114,13 @@ def run():
     user_audio_query = get_user_audio_query()
     if user_audio_query is None:
         return
-    print(f"Input question: {query}")
+    print(f"Input question: {user_audio_query}")
 
     # Get agent response
     recording_name = "default"
     output_path = f"agent_reponse.mp3"
     get_chatgpt_response(
-        input_path=user_audio_query,
+        query=user_audio_query,
         output_path=output_path
         )
 
