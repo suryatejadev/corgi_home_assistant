@@ -158,7 +158,7 @@ def get_user_audio_query_from_phone():
 
     return query
 
-async def keyword_detection():
+def keyword_detection():
     r = sr.Recognizer()
     with sr.Microphone() as source:
         audio = r.listen(source, phrase_time_limit=2 if hotword else 5)
@@ -174,7 +174,7 @@ async def keyword_detection():
             pass
     return
 
-async def get_user_audio_query_from_microphone():
+def get_user_audio_query_from_microphone():
     r = sr.Recognizer()
     with sr.Microphone() as source:
         audio = r.listen(source, phrase_time_limit=2 if hotword else 5)
